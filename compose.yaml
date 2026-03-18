@@ -1,0 +1,8 @@
+services:
+  backend:
+    image: ghcr.io/igor-wolf/amazon-products:latest
+    restart: always  # <-- Esta linha faz a mágica
+    env_file:
+      - .env
+    ports:
+      - "3555:3555"
