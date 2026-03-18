@@ -1,35 +1,28 @@
-# 1. Mudamos de alpine para slim (Debian), que é compatível com os navegadores
-FROM node:20-slim
+# 1. Usamos a imagem oficial do Playwright (já vem com Node, Browsers e Libs)
+FROM mcr.microsoft.com/playwright:v1.42.1-jammy
 
+# Define o diretório de trabalho
 WORKDIR /app
 
-# Instala dependências do sistema necessárias para o Playwright no Linux
-# Isso evita erros de "missing shared libraries"
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    && rm -rf /var/lib/apt/lists/*
-
+# 2. Copia os arquivos de dependências
 COPY package*.json ./
 
-# 2. Instala as dependências do projeto
+# 3. Instala as dependências do seu projeto
+# Nota: Não precisamos rodar 'npx playwright install' aqui porque 
+# os browsers já estão na imagem base!
 RUN npm install
 
-# 3. Instala o binário do Chromium E as dependências de sistema dele
-# O comando --with-deps é o segredo aqui
-RUN npx playwright install --with-deps chromium
-
+# 4. Copia o restante do seu código
 COPY . .
 
-# 4. Gera o build do projeto
+# 5. Gera o build (pasta /dist)
 RUN npm run dist
 
-# 5. Remove dependências de dev (Opcional, mas cuidado se o Playwright sumir)
-# Se o seu 'npm run dist' já gerou tudo, isso ajuda no espaço.
+# 6. Limpeza (Opcional)
 RUN npm prune --production
 
+# Expõe a porta da sua API
 EXPOSE 3333
 
-# O Docker passará as variáveis de ambiente do seu arquivo .env automaticamente 
-# se você rodar com --env-file no comando do docker run
+# Comando para iniciar
 CMD ["node", "dist/server.js"]
