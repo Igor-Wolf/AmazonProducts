@@ -1,1 +1,70 @@
-import F from"express";import G from"cors";import{Router as D}from"express";import b from"fs";import m from"path";import*as P from"numpy-parser";import{env as R,pipeline as $}from"@xenova/transformers";var T=(o,t=5,a=!1)=>{let n=process.cwd(),f=m.join(n,"data","mapeamento.json"),p=m.join(n,"data","vetores_inteligentes.npy");b.existsSync(f)||(f=m.join(n,"src","data","mapeamento.json"),p=m.join(n,"src","data","vetores_inteligentes.npy"));let y=JSON.parse(b.readFileSync(f,"utf-8")),l=b.readFileSync(p),e=P.fromArrayBuffer(l.buffer.slice(l.byteOffset,l.byteOffset+l.byteLength)),[i,r]=e.shape,c=o.trim().toLowerCase(),g=y.findIndex(s=>a?s.sinopse?.toLowerCase().includes(c):s.titulo?.trim().toLowerCase()===c);if(g===-1)return[];let L=e.data.slice(g*r,(g+1)*r),O=[];for(let s=0;s<i;s++){if(s===g)continue;let d=e.data.slice(s*r,(s+1)*r),x=0,H=0,q=0;for(let u=0;u<r;u++)x+=L[u]*d[u],H+=L[u]**2,q+=d[u]**2;let J=x/(Math.sqrt(H)*Math.sqrt(q));O.push([s,J])}return O.sort((s,d)=>d[1]-s[1]).slice(0,t).map(([s,d])=>{let x=y[s];return{titulo:x.titulo||"N/A",url:x.img,similaridade:Number(d.toFixed(2))}})},j=process.cwd();R.localModelPath=m.join(j,"src","data");R.allowLocalModels=!0;R.allowRemoteModels=!1;R.backends.onnx.wasm.numThreads=1;var w=null,h=null,C=null,z=async(o,t=4)=>{if(!w)try{console.log("\u{1F680} Inicializando Extrator de Caracter\xEDsticas (WASM)..."),w=await $("feature-extraction","modelo_onnx",{model_file_name:"model_quantized",quantized:!0});let e=m.join(j,"src","data","mapeamento.json"),i=m.join(j,"src","data","vetores_inteligentes.npy");h=JSON.parse(b.readFileSync(e,"utf-8"));let r=b.readFileSync(i);C=P.fromArrayBuffer(r.buffer.slice(r.byteOffset,r.byteOffset+r.byteLength)),console.log("\u2705 Motor de recomenda\xE7\xE3o e base de dados carregados!")}catch(e){throw console.error("\u274C Erro na inicializa\xE7\xE3o do reposit\xF3rio:",e.message),e}let a=await w(o,{pooling:"mean",normalize:!0}),n=Array.from(a.data),[f,p]=C.shape,y=[],l=o.trim().toLowerCase();for(let e=0;e<f;e++){if(h[e].titulo.toLowerCase().trim()===l)continue;let i=C.data.slice(e*p,(e+1)*p),r=0;for(let c=0;c<p;c++)r+=n[c]*i[c];y.push({idx:e,score:r})}return y.sort((e,i)=>i.score-e.score).slice(0,t).map(e=>({titulo:h[e.idx].titulo,similaridade:`${(e.score*100).toFixed(2)}%`,img:h[e.idx].img}))};var v=async o=>({statusCode:200,body:o});var S=async()=>({statusCode:204,body:null});var B=async o=>{let t=await T(o);return console.log(t),t?v(t):S()},M=async o=>{let t=await z(o);return console.log(t),t?v(t):S()};var N=async(o,t)=>{let a=o.params.title;console.log(a);let n=await B(a);t.status(n.statusCode).json(n.body)},_=async(o,t)=>{let a=o.params.title;console.log(a);let n=await M(a);t.status(n.statusCode).json(n.body)};var A=D();A.get("/recomendation/1/:title",N);A.get("/recomendation/2/:title",_);var E=A;function W(){let o=F();return o.use(F.json()),o.use(G({origin:"*",methods:["GET","POST","PATCH","DELETE","OPTIONS"],allowedHeaders:["Content-Type","Authorization"]})),o.use("/api",E),o}var k=W;var K=k(),I=process.env.PORT;K.listen(I,()=>{console.log(`Server is running at port ${I}`)});
+import z from"express";import G from"cors";import{Router as V}from"express";import{MongoClient as k,ObjectId as d}from"mongodb";import"dotenv/config";var P=process.env.MONGO_URI;if(!P)throw new Error("MONGO_URI n\xE3o definida no .env");var h=new k(P),y=null,u=async()=>y||(await h.connect(),y=h.db(process.env.DATABASE),console.log("\u{1F50B} Nova conex\xE3o com MongoDB estabelecida"),y),m=async e=>{try{let o=(await u()).collection(process.env.COLLECTION),t={_id:new d(e)},s=await o.findOne(t);if(!s){console.log("\u26A0\uFE0F Usu\xE1rio n\xE3o encontrado");return}return s}catch(r){throw console.error("\u274C Erro ao ler usu\xE1rio:",r),r}};async function w(e,r,o){let t=await m(e),s=o==="asc"?1:-1;if(t)try{let n=(await u()).collection(process.env.COLLECTIONPRODUCTS),c={userId:new d(t._id)};r&&(c.title={$regex:r,$options:"i"});let a=await n.find(c).sort({_id:s}).toArray();if(!a){console.log("\u26A0\uFE0F Usu\xE1rio n\xE3o encontrado");return}return a}catch(i){throw console.error("\u274C Erro ao ler usu\xE1rio:",i),i}}var v=async e=>{let t=await(await u()).collection(process.env.COLLECTIONPRODUCTS).insertOne(e);if(t)return{message:"created",_id:t.insertedId}},b=async(e,r,o)=>{let s=(await u()).collection(process.env.COLLECTIONPRODUCTS),{_id:i,userId:n,...c}=r;try{let a={userId:new d(e),_id:new d(o)};return(await s.updateOne(a,{$set:c})).matchedCount===1?{message:"updated"}:null}catch(a){console.error("Erro no Mongo:",a);return}},M=async(e,r)=>{let t=(await u()).collection(process.env.COLLECTIONPRODUCTS);try{let s={userId:new d(e),_id:new d(r)};return(await t.deleteOne(s)).deletedCount===1?{message:"deleted"}:null}catch(s){console.error("Error ",s);return}};var l=async e=>({statusCode:200,body:e});var g=async()=>({statusCode:204,body:null}),f=async()=>({statusCode:400,body:null});import{chromium as H}from"playwright";async function x(e){let r=await H.launch({headless:!1,slowMo:50}),t=await(await r.newContext()).newPage();try{let s=e;console.log("\u{1F680} Iniciando navega\xE7\xE3o..."),await t.goto(s,{waitUntil:"domcontentloaded"});try{let n=t.getByRole("button",{name:/continuar comprando/i});await n.isVisible({timeout:1e3})&&(console.log("\u{1F7E1} Clicando em continuar comprando..."),await n.click())}catch{}let i={title:await t.locator(".a-size-large.celwidget").innerText(),type:await t.locator('[aria-checked="true"] .slot-title span[aria-label]').innerText(),url:t.url(),img:await t.locator("#landingImage").getAttribute("src"),price:await t.locator(".a-size-base.a-color-price").innerText(),timestamp:new Date().toISOString()};return i.price=parseFloat(i.price.replace(/[^\d,]/g,"").replace(",",".")),console.log("\u2705 Dados coletados:",i),i}catch(s){console.error("\u274C Erro durante o scraping:",s)}finally{await r.close(),console.log("\u{1F512} Navegador encerrado.")}}var R=async(e,r,o)=>{let t=await w(e,r,o);return t?l(t):g()},C=async(e,r)=>{let o=await m(r);if(o){let t=await x(e.url);t.userId=o._id,t.desiredPrice=e.price,t.lowPrice=t.price;let s=await v(t);return l(s)}else return g()},L=async(e,r)=>{let o=null;if(e){let t=await b(r,e,e._id);t?o=await l(t):o=await f()}else o=await f();return o},O=async(e,r)=>{let o=null;if(e&&r){let t=await M(e,r);t?o=await l(t):o=await f()}else o=await f();return o};var S=async(e,r)=>{let o=e.headers.authorization,{title:t,order:s}=e.query,i=await R(o,t,s);r.status(i.statusCode).json(i.body)},E=async(e,r)=>{let o=e.body,t=e.headers.authorization,s=await C(o,t);r.status(s.statusCode).json(s.body)},D=async(e,r)=>{let o=e.headers.authorization,t=e.body,s=await L(t,o);r.status(s.statusCode).json(s.body)},T=async(e,r)=>{let o=e.headers.authorization,t=e.params.id,s=await O(o,t);r.status(s.statusCode).json(s.body)};import N from"nodemailer";var $=(e,r,o,t)=>{let s=i=>i.map(n=>`
+      <div style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center;">
+        <img src="${n.img}" alt="${n.title}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; margin-right: 15px;">
+        <div style="flex: 1;">
+          <h4 style="margin: 0 0 5px 0; color: #333;">${n.title}</h4>
+          <p style="margin: 0; color: #333; font-weight: bold;">Atual: </p>
+          <p style="margin: 0; color: #007bff; font-weight: bold;">R$ ${n.price.toFixed(2)}</p>
+            <p style="margin: 0; color: #333; font-weight: bold;">Menor: </p>
+
+          <p style="margin: 0; color:rgb(60, 255, 0); font-weight: bold;">R$ ${n.lowPrice.toFixed(2)}</p>
+                    <p style="margin: 0; color: #333; font-weight: bold;">Desejado: </p>
+
+          <p style="margin: 0; color:rgb(255, 218, 5); font-weight: bold;">R$ ${n.desiredPrice.toFixed(2)}</p>
+                    <p style="margin: 0; color: #333; font-weight: bold;">Data menor pre\xE7o:  </p>
+
+         <p style="margin: 0; color:rgb(255, 255, 255); font-weight: bold;">${new Date(n.timestamp).toLocaleDateString("pt-BR")}</p>
+
+          <a href="${n.url}" style="font-size: 12px; color: #666; text-decoration: underline;">Ver produto</a>
+        </div>
+      </div>
+    `).join("");return`
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produtos</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+        .email-container { max-width: 600px; margin: 20px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(90deg, #00dd8f, #007bff); color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; color: #333; }
+        .product-section { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; }
+        .button { display: inline-block; background: linear-gradient(90deg, #00dd8f, #007bff); color: white; text-decoration: none; padding: 12px 25px; border-radius: 4px; font-weight: bold; }
+        .footer { background-color: #f4f4f4; color: #666; text-align: center; padding: 15px; font-size: 13px; }
+        h3 { color: #007bff; border-left: 4px solid #00dd8f; padding-left: 10px; }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>Amazon Scraper</h1>
+        </div>
+        <div class="content">
+            <p>Ol\xE1, <strong>${e}</strong>!</p>
+            <p>Veja os produtos analisados para voc\xEA:</p>          
+
+            ${o.length>0?`
+              <div class="product-section">
+                <h3>Seu pre\xE7o escolhido</h3>
+                ${s(o)}
+              </div>
+            `:""}
+
+            ${t.length>0?`
+              <div class="product-section">
+                <h3>Menores pre\xE7os hist\xF3ricos</h3>
+                ${s(t)}
+              </div>
+            `:""}
+
+            <p style="font-size: 12px; color: #999; margin-top: 30px;">Se voc\xEA n\xE3o solicitou este contato, por favor ignore este e-mail.</p>
+        </div>
+        <div class="footer">
+            <p>\xA9 2026 Equipe Amazon Scraper</p>
+        </div>
+    </div>
+</body>
+</html>
+`};var q=N.createTransport({service:"gmail",auth:{user:"programadorigorrb@gmail.com",pass:process.env.EMAIL_PASS},tls:{rejectUnauthorized:!1}}),A=async(e,r,o,t,s,i)=>{try{let n={from:'"Amazon Scrapler" <programadorigorrb@gmail.com>',to:e,subject:r,html:$(t,o,s,i)},c=await q.sendMail(n);return{message:"E-mail enviado com sucesso:'"}}catch(n){return{message:`Erro ao enviar e-mail: ${n}`}}};var B=e=>new Promise(r=>setTimeout(r,e)),I=async(e,r)=>{let o=await w(e,r,"desc"),t=await m(e);if(o){let s=[],i=[];for(let n of o){console.log(`Verificando produto: ${n.title}`);let c=!1;try{let a=await x(n.url);a.price<n.lowPrice&&(n.lowPrice=a.price,n.timestamp=a.timestamp,s.push({...n}),c=!0),a.price!=n.price&&(n.price=a.price,c=!0),a.price<=n.desiredPrice&&i.push({...n}),c&&await b(n.userId,n,n._id),await B(1e3)}catch(a){console.error(`Erro ao processar ${n.title}:`,a)}}return await A(t.email,"Produtos","www....",t.name,i,s),l({message:"Email Enviado"})}else return g()};var U=async(e,r)=>{let o=e.headers.authorization,{title:t}=e.query,s=await I(o,t);r.status(s.statusCode).json(s.body)};var p=V();p.get("/myList",S);p.post("/insertMyList",E);p.patch("/updateMyList",D);p.delete("/deleteMyList/:id",T);p.get("/allProductsEmail",U);var F=p;function Y(){let e=z();return e.use(z.json()),e.use(G({origin:"*",methods:["GET","POST","PATCH","DELETE","OPTIONS"],allowedHeaders:["Content-Type","Authorization"]})),e.use("/api",F),e}var j=Y;var J=j(),_=process.env.PORT;J.listen(_,()=>{console.log(`Server is running at port ${_}`)});
