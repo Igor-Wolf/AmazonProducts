@@ -1,5 +1,5 @@
 # 1. Usamos a imagem oficial do Playwright (já vem com Node, Browsers e Libs)
-FROM mcr.microsoft.com/playwright:v1.42.1-jammy
+FROM mcr.microsoft.com/playwright:v1.58.2-jammy
 
 # Define o diretório de trabalho
 WORKDIR /app
