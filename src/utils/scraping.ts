@@ -3,7 +3,7 @@ import { chromium, Browser, BrowserContext, Page } from "playwright";
 export async function scraping(urlPage: string): Promise<void> {
   // Inicializa o browser com tipagem explícita
   const browser: Browser = await chromium.launch({
-    headless: false, // Mude para true em produção
+    headless: true, // Mude para true em produção
     slowMo: 50, // Atraso de 50ms para podermos ver a ação (opcional)
   });
 
