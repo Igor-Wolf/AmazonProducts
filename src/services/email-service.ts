@@ -29,6 +29,11 @@ export const allProducstVerifyService = async (user: string, title: string) => {
     try {
         let producScrap: ProductsFinalModel = await scraping(p.url);
         
+        // Lógica de Preço Diferente
+        if (producScrap.price != p.price) {          
+            p.price = producScrap.price;
+            houveAlerta = true; // Caiu no segundo IF
+        }
         // Lógica de Preço Menor que o Histórico
         if (producScrap.price < p.lowPrice) {
             p.lowPrice = producScrap.price;
@@ -38,11 +43,6 @@ export const allProducstVerifyService = async (user: string, title: string) => {
             houveAlerta = true; // Caiu no primeiro IF
         }
         
-        // Lógica de Preço Diferente
-        if (producScrap.price != p.price) {          
-            p.price = producScrap.price;
-            houveAlerta = true; // Caiu no segundo IF
-        }
         // Lógica de Preço Desejado
         if (producScrap.price <= p.desiredPrice) {
             ProdutosPreçoDesejado.push({...p});            
