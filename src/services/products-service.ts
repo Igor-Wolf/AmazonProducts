@@ -24,7 +24,7 @@ export const insertMyListService = async (bodyValue : any, user: string) => {
     producScrap.desiredPrice = bodyValue.price
     producScrap.lowPrice = producScrap.price
     const data =  await insertProduct(producScrap)
-
+    
     return ok(data);
   } else {
     return noContent();
