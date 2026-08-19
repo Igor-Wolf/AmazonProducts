@@ -26,41 +26,43 @@ export const allProducstVerifyService = async (user: string, title: string) => {
     for (const p of database) {
       console.log(`Verificando produto: ${p.title}`);
 
-      // 1.  Flag
       let houveAlerta = false;
 
       try {
-        let producScrap: ProductsFinalModel = await scraping(p.url);
+        // CORREÇÃO 1: Passamos o `p.lowPrice` atual do banco para o scraping
+        let producScrap = await scraping(p.url, p.lowPrice);
 
-        // Lógica de Preço Diferente
-        if (producScrap.price != p.price) {
+        if (!producScrap) continue; // Segurança caso o scraping falhe
+
+        // Verifica se o preço atual mudou em relação ao banco
+        if (producScrap.price !== p.price) {
           p.price = producScrap.price;
-          houveAlerta = true; // Caiu no segundo IF
+          houveAlerta = true;
         }
-        // Lógica de Preço Menor que o Histórico
-        if (producScrap.price < p.lowPrice) {
-          p.lowPrice = producScrap.price;
+
+        // CORREÇÃO 2: Aproveitamos o lowPrice já tratado e calculado pela função scraping!
+        if (producScrap.lowPrice !== undefined && producScrap.lowPrice !== p.lowPrice) {
+          p.lowPrice = Number(producScrap.lowPrice);
           p.timestamp = producScrap.timestamp;
           ProdutosMenorPrecoHistórico.push({ ...p });
-
-          houveAlerta = true; // Caiu no primeiro IF
+          houveAlerta = true;
         }
 
         // Lógica de Preço Desejado
-        if (producScrap.price <= p.desiredPrice) {
+        if (Number(producScrap.price) <= p.desiredPrice) {
           ProdutosPreçoDesejado.push({ ...p });
         }
 
-        // 2. Flag no final da iteração
+        // Se houve qualquer alteração (preço ou lowPrice), atualiza no banco
         if (houveAlerta) {
           await updateMyListRepository(p.userId, p, p._id);
         }
+        
         await sleep(1000);
       } catch (error) {
         console.error(`Erro ao processar ${p.title}:`, error);
       }
     }
-    // Não criou nada novo, apenas executou comandos.
 
     await sendEmail2(
       userInfo.email,
